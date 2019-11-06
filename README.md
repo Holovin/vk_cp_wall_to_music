@@ -1,5 +1,5 @@
 # Usage
-1. Node 10+
+1. Node 12+
 2. `npm i`
 3. Get token (for example: manually from VK Admin app via https://vkhost.github.io/)
 4. `node index.js --token=TOKEN --from_id=ID --start_offset=START_OFFSET`
