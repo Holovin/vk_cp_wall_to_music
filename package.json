@@ -1,0 +1,23 @@
+{
+  "name": "vk_cp_wall_to_music",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Holovin/vk_cp_wall_to_music.git"
+  },
+  "author": "Alex Holovin",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Holovin/vk_cp_wall_to_music/issues"
+  },
+  "homepage": "https://github.com/Holovin/vk_cp_wall_to_music#readme",
+  "dependencies": {
+    "axios": "^0.19.0",
+    "nconf": "^0.10.0"
+  }
+}
