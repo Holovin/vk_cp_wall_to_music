@@ -7,6 +7,8 @@ const token = nconf.get('token');
 const fromId = nconf.get('from_id');
 const startOffset = nconf.get('start_offset');
 
+const readline = require('readline');
+
 if (!token || !fromId || !startOffset) {
     console.error('Run as "node index.js --token=TOKEN" --from_id=ID --start_offset=START_OFFSET');
     process.exit(1);
@@ -18,6 +20,28 @@ class App {
         this.fromId = fromId;
         this.count = 10;
         this.offset = offset - this.count;
+
+        this.rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+    }
+
+    async readln(query) {
+        return new Promise(resolve => {
+            const ask = () => {
+                this.rl.question(query, answer => {
+                    if (answer) {
+                        resolve(answer);
+
+                    } else {
+                        ask();
+                    }
+                });
+            };
+
+            ask();
+        })
     }
 
     async getPosts() {
@@ -45,16 +69,34 @@ class App {
 
 
                 for (const audio of audios) {
-                    const a = await this.audioAdd(audio.id, audio.owner);
+                    let extObject = {};
 
-                    if (a.data.error) {
-                        console.log(`[-] Need restart from ${this.offset+this.count}, ${JSON.stringify(a.data.error)}`);
-                        process.exit(1);
-                    }
+                    do {
+                        const response = await this.audioAdd(audio.id, audio.owner, extObject);
+                        const status = this.processResponse(response, true);
 
-                    console.log(`[+] ${audio._debug} `);
+                        if (status.type === 'captcha') {
+                            console.log(`[C] ${audio._debug} `);
+                            const code = await this.readln('[_] Enter captcha code:\n>>>>> ');
+                            console.log(`[!] Try again... (key: ${code}, sid: ${status.sid})`);
 
-                    await this.delay(10000);
+                            extObject = {
+                                'captcha_sid': status.sid,
+                                'captcha_key': code,
+                            };
+
+                        } else if (status.type === 'other') {
+                            console.log(`[-] Unhandled error, need restart from ${this.offset+this.count}`);
+                            const code = await this.readln(`[E] ${audio._debug}`);
+
+                        } else if (status.type === 'ok' || status.type === 'skip') {
+                            console.log(`[+] ${status.type} // ${audio._debug} `);
+                            break;
+                        }
+
+                    } while (true);
+
+                    await this.delay(1000);
                 }
 
                 this.offset -= this.count;
@@ -63,6 +105,31 @@ class App {
         } catch (e) {
             console.error(`Something wrong: ${e}`);
         }
+    }
+
+    processResponse(response, handleCaptcha = false) {
+        if (response.data.error) {
+            const e = response.data.error;
+
+            if (handleCaptcha && e.error_code === 14) {
+                console.log(`[C] Captcha url: ${e.captcha_img}`);
+                return {
+                    type: 'captcha',
+                    sid: e.captcha_sid,
+                };
+            }
+
+            if (e.error_code === 15) {
+                console.log(`[?] Access error: ${JSON.stringify(e)}`);
+
+                return { type: 'skip' };
+            }
+
+            console.log(`[E] Unhandled error: ${JSON.stringify(e)}`);
+            return { type: 'other' };
+        }
+
+        return { type: 'ok' };
     }
 
     parsePost(post) {
@@ -115,10 +182,11 @@ class App {
         return this.execApi('wall.get', params);
     }
 
-    async audioAdd(id, owner) {
+    async audioAdd(id, owner, captchaObject) {
         const params = {
             'audio_id': id,
             'owner_id': owner,
+            ...captchaObject,
         };
 
         return this.execApi('audio.add', params);
